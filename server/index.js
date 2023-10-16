@@ -9,9 +9,18 @@ const notion = new Client({
     auth: process.env.NOTION_KEY,
 });
 
-// Get all book club members
+// tracks duplicate ratings
+let ratingsMap = new Map();
 
-let ratings = [];
+let avgRatingMap = new Map();
+
+function formatMemberName(memberName) {
+    return memberName.trim().toLowerCase();
+}
+
+function formatBookName(bookName) {
+    return bookName.trim().toLowerCase();
+}
 
 // Reads in Member Data from CSV
 async function getRatingsFromCsv() {
@@ -22,15 +31,55 @@ async function getRatingsFromCsv() {
         inputStream
             .pipe(new CsvReadableStream({ parseNumbers: true, parseBooleans: true, trim: true }))
             .on('data', function (row) {
+
+                // remove whitespace from names
+                const bookTitle = formatBookName(row[0]);
+                const bookRating = row[2];
+                const memberName = formatMemberName(row[1]);
+
                 const rating = {
-                    'book title': row[0],
-                    'rating': row[2],
-                    'member': row[1],
+                    'book title': bookTitle,
+                    'rating': bookRating,
+                    'member': memberName,
+                    'favorite' : bookRating == 5
                 };
 
-                ratings.push(rating);
+                const ratingKey = bookTitle + "," + memberName;
+
+                // should update existing entry to update to latest rating
+                ratingsMap.set(ratingKey, rating);
             })
             .on('end', function () {
+
+                for (let ratingKey of ratingsMap.keys()) {
+
+                    const rating = ratingsMap.get(ratingKey);
+                    if (avgRatingMap.has(rating['book title'])) {
+
+                        avgRatingMap.set(
+                            rating['book title'], 
+                                [
+                                    Number(avgRatingMap.get(rating['book title'])[0]) + Number(rating.rating),
+                                    Number(avgRatingMap.get(rating['book title'])[1]) + 1,
+                                    Number(avgRatingMap.get(rating['book title'])[2]) + Number(rating.favorite)   
+                                ]
+                            );
+
+                    } else {
+                        avgRatingMap.set(
+                            rating['book title'], 
+                                [
+                                    Number(rating.rating), 
+                                    1,
+                                    Number(rating.favorite)
+                                ]
+                            );
+                    }
+
+                }
+
+                console.log(avgRatingMap)
+
                 resolve();
             });
     });
@@ -40,11 +89,14 @@ async function createNotionPage() {
 
     await getRatingsFromCsv();
 
-    console.log(ratings);
-
-    for (let rating of ratings) 
+    for (let book of avgRatingMap.keys()) 
         {
-            const response = await notion.pages.create({
+
+            const avgRating = Math.round(
+                (avgRatingMap.get(book)[0] / avgRatingMap.get(book)[1]) 
+                * 100) / 100;
+
+            await notion.pages.create({
             "parent": {
                 "type": "database_id",
                 "database_id": process.env.NOTION_DATABASE_ID
@@ -55,7 +107,7 @@ async function createNotionPage() {
                         {
                             "type": "text",
                             "text": {
-                            "content": rating['book title'],
+                            "content": book,
                             "link": null
                             },
                             "annotations": {
@@ -66,27 +118,19 @@ async function createNotionPage() {
                             "code": false,
                             "color": "default"
                             },
-                            "plain_text": rating['book title'],
+                            "plain_text": book,
                             "href": null
                         }
                     ]
                 },
                 "Rating": {
-                    "number": rating.rating
+                    "number": avgRating
                 },
-                "Member Name": {
-                    "type": "rich_text",
-                        "rich_text": [
-                            {
-                            "type": "text",
-                            "text": { "content": rating.member }
-                            }
-                        ]
+                "Number of Favorites": {
+                    "number" : avgRatingMap.get(book)[2]
                 }
             }
         })
-
-        // console.log(response)
     }
 }
 
