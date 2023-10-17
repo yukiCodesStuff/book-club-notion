@@ -22,6 +22,15 @@ In terms of improvements to the documentation, my only suggestion would be to pr
 
 ## Libraries Used
 
-[csv-reader](https://www.npmjs.com/package/csv-reader)
-[axios](https://www.npmjs.com/package/axios)
-[@notionhq/client](https://www.npmjs.com/package/@notionhq/client)
+* [csv-reader for data processing](https://www.npmjs.com/package/csv-reader)
+* [axios for networking](https://www.npmjs.com/package/axios)
+* [@notionhq/client for Notion Database](https://www.npmjs.com/package/@notionhq/client)
+* [autodetect-decoder-stream for csv decoding](https://www.npmjs.com/package/autodetect-decoder-stream)
+
+## Useful Links
+
+* https://github.com/makenotion/notion-sdk-js/issues/138
+* https://github.com/makenotion/notion-sdk-js
+* https://www.notion.so/help/add-and-manage-connections-with-the-api
+* https://www.reddit.com/r/Notion/comments/nembqc/database_id_not_found/
+* https://developers.notion.com/docs
