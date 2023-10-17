@@ -9,10 +9,8 @@ const notion = new Client({
     auth: process.env.NOTION_KEY,
 });
 
-// tracks duplicate ratings
-let ratingsMap = new Map();
 
-let avgRatingMap = new Map();
+// Helper Methods
 
 function formatMemberName(memberName) {
     return memberName.trim().toLowerCase();
@@ -21,6 +19,13 @@ function formatMemberName(memberName) {
 function formatBookName(bookName) {
     return bookName.trim().toLowerCase();
 }
+
+
+// tracks the most recent rating, eliminating duplicates
+let ratingsMap = new Map();
+
+// holds data necessary for computing the average rating
+let avgRatingMap = new Map();
 
 // Reads in Member Data from CSV
 async function getRatingsFromCsv() {
@@ -32,7 +37,15 @@ async function getRatingsFromCsv() {
             .pipe(new CsvReadableStream({ parseNumbers: true, parseBooleans: true, trim: true }))
             .on('data', function (row) {
 
-                // remove whitespace from names
+                /*
+
+                    This is where mostly all the edge cases I considered existed. The edge cases I considered
+                    were all related to improper input, such as misspelling a book title, missing certain fields,
+                    and having an improper rating (too high or too low)
+
+                */
+
+                // format the incoming data
                 const bookTitle = formatBookName(row[0]);
                 const bookRating = row[2];
                 const memberName = formatMemberName(row[1]);
@@ -44,6 +57,7 @@ async function getRatingsFromCsv() {
                     'favorite' : bookRating == 5
                 };
 
+                // provide a unique key for each rating
                 const ratingKey = bookTitle + "," + memberName;
 
                 // should update existing entry to update to latest rating
@@ -59,9 +73,9 @@ async function getRatingsFromCsv() {
                         avgRatingMap.set(
                             rating['book title'], 
                                 [
-                                    Number(avgRatingMap.get(rating['book title'])[0]) + Number(rating.rating),
-                                    Number(avgRatingMap.get(rating['book title'])[1]) + 1,
-                                    Number(avgRatingMap.get(rating['book title'])[2]) + Number(rating.favorite)   
+                                    Number(avgRatingMap.get(rating['book title'])[0]) + Number(rating.rating),  // rating sum
+                                    Number(avgRatingMap.get(rating['book title'])[1]) + 1,                      // rating count
+                                    Number(avgRatingMap.get(rating['book title'])[2]) + Number(rating.favorite) // number of times book has been favorited
                                 ]
                             );
 
@@ -85,7 +99,7 @@ async function getRatingsFromCsv() {
     });
 }
 
-async function createNotionPage() {
+async function createNotionPage() { // upload data to the Notion Database
 
     await getRatingsFromCsv();
 
